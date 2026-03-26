@@ -35,7 +35,6 @@
     </div>
 
     <script>
-        // REPLACE THESE with your actual keys from Supabase
         const SUPABASE_URL = 'https://shxfdgrtyxrxqtuvanvs.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoeGZkZ3J0eXhyeHF0dXZhbnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjM1MjEsImV4cCI6MjA5MDAzOTUyMX0.z-qAQL35jLAxpcp2Q91t-pvB4roaZwL4tAjF_9HaY_Y';
         
