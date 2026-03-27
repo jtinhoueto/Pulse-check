@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PulseCheck 2026 | Live Feedback</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: sans-serif; display: flex; justify-content: center; padding-top: 50px; background: #f0f2f5; }
+        .card { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 400px; }
+        .button-group { margin: 20px 0; display: flex; justify-content: center; gap: 10px; }
+        button { padding: 10px 15px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; transition: opacity 0.2s; }
+        button:hover { opacity: 0.8; }
+        .btn-great { background: #4ade80; }
+        .btn-ok { background: #fbbf24; }
+        .btn-boring { background: #f87171; }
+        #status { font-size: 0.8rem; color: #888; margin-top: 15px; }
+        canvas { margin-top: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>How's the session going?</h2>
+        <p>Your feedback is live and anonymous.</p>
+        
+        <div class="button-group">
+            <button class="btn-great" onclick="castVote('Great')">Great! 🚀</button>
+            <button class="btn-ok" onclick="castVote('Okay')">It's Okay 😐</button>
+            <button class="btn-boring" onclick="castVote('Boring')">Boring... 😴</button>
+        </div>
+
+        <canvas id="feedbackChart"></canvas>
+        <p id="status">Connecting to live database...</p>
+    </div>
+
+    <script>
+        // --- CONFIGURATION ---
+        const SUPABASE_URL = 'https://shxfdgrtyxrxqtuvanvs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNoeGZkZ3J0eXhyeHF0dXZhbnZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NjM1MjEsImV4cCI6MjA5MDAzOTUyMX0.z-qAQL35jLAxpcp2Q91t-pvB4roaZwL4tAjF_9HaY_Y';
+
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let myChart;
+        let voteCounts = { 'Great': 0, 'Okay': 0, 'Boring': 0 };
+
+        // Initialize Chart.js
+        function initChart() {
+            const ctx = document.getElementById('feedbackChart').getContext('2d');
+            myChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Great', 'Okay', 'Boring'],
+                    datasets: [{
+                        label: 'Live Votes',
+                        data: [0, 0, 0],
+                        backgroundColor: ['#4ade80', '#fbbf24', '#f87171']
+                    }]
+                },
+                options: { 
+                    scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
+
+        // Send a vote to Supabase
+        async function castVote(choice) {
+            document.getElementById('status').innerText = "Sending vote...";
+            const { error } = await supabaseClient
+                .from('votes')
+                .insert([{ choice: choice }]);
+            
+            if (error) {
+                console.error(error);
+                document.getElementById('status').innerText = "Error sending vote.";
+            } else {
+                document.getElementById('status').innerText = "Vote counted!";
+            }
+        }
+
+        // Load data and listen for live updates
+        async function setup() {
+            initChart();
+
+            // 1. Get initial totals from the 'votes' table
+            const { data, error } = await supabaseClient.from('votes').select('choice');
+            
+            if (error) {
+                document.getElementById('status').innerText = "Connection error. Check RLS policies.";
+                return;
+            }
+
+            data.forEach(v => {
+                if(voteCounts.hasOwnProperty(v.choice)) voteCounts[v.choice]++;
+            });
+            updateChart();
+
+            // 2. Listen for Realtime inserts
+            supabaseClient
+                .channel('live-votes')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'votes' }, payload => {
+                    const newChoice = payload.new.choice;
+                    if(voteCounts.hasOwnProperty(newChoice)) {
+                        voteCounts[newChoice]++;
+                        updateChart();
+                    }
+                })
+                .subscribe();
+            
+            document.getElementById('status').innerText = "Live and connected!";
+        }
+
+        function updateChart() {
+            myChart.data.datasets[0].data = [voteCounts['Great'], voteCounts['Okay'], voteCounts['Boring']];
+            myChart.update();
+        }
+
+        setup();
+    </script>
+</body>
+</html>
